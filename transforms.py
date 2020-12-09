@@ -5,6 +5,7 @@ import random
 import torch
 
 from torchvision.transforms import functional as F
+import pycocotools
 
 
 def _flip_coco_person_keypoints(kps, width):
@@ -32,16 +33,17 @@ class RandomHorizontalFlip(object):
         self.prob = prob
 
     def __call__(self, image, targets = None):
-        print(image)
-        print(targets[0])
         if random.random() < self.prob:
             height, width = image.shape[-2:]
             image = image.flip(-1)
             if targets:
                 for target in targets:
-                    bbox = target["bbox"]
-                    bbox[:, [0, 2]] = width - bbox[:, [2, 0]]
-                    target["bbox"] = bbox
+                    boxes = target["boxes"]
+                    boxes[0] = width - boxes[0]
+                    boxes[2] = width - boxes[2]
+                    x0 = min(boxes[0], boxes[2])
+                    x1 = max(boxes[0], boxes[2])
+                    target["boxes"] = torch.tensor([x0, boxes[1], x1, boxes[3]])
                     if "masks" in target:
                         target["masks"] = target["masks"].flip(-1)
                     if "keypoints" in target:
@@ -55,4 +57,48 @@ class ToTensor(object):
     def __call__(self, image, target):
         image = F.to_tensor(image)
         return image, target
+
+
+def _annToRLE(ann, height, width):
+    """
+    Convert annotation which can be polygons, uncompressed RLE to RLE.
+    :return: binary mask (numpy 2D array)
+    """
+    segm = ann['segmentation']
+    if isinstance(segm, list):
+        # polygon -- a single object might consist of multiple parts
+        # we merge all parts into one mask rle code
+        rles = pycocotools.mask.frPyObjects(segm, height, width)
+        rle = pycocotools.mask.merge(rles)
+    elif isinstance(segm['counts'], list):
+        # uncompressed RLE
+        rle = pycocotools.mask.frPyObjects(segm, height, width)
+    else:
+        # rle
+        rle = ann['segmentation']
+    return rle
+
+
+def _annToMask(ann, height, width):
+    """
+    Convert annotation which can be polygons, uncompressed RLE, or RLE to binary mask.
+    :return: binary mask (numpy 2D array)
+    """
+    rle = _annToRLE(ann, height, width)
+    m = pycocotools.mask.decode(rle)
+    return m
+
+
+class PreProcess:
+    def __call__(self, image, targets):
+
+        for target in targets:
+            x, y, w, h = target['bbox']
+            target['boxes'] = torch.Tensor([x, y, x + w, y + h])
+            del target['bbox']
+            h, w = image.shape[1:]
+            target['masks'] = torch.tensor(_annToMask(target, h, w))
+            target['labels'] = torch.tensor(target['category_id'])
+
+        return image, targets
 
