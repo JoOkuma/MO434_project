@@ -32,9 +32,16 @@ class TACODataset(torchvision.datasets.CocoDetection):
         return img, targets
 
     def preprocess(self, img, targets):
+        new_targets = []
         for target in targets:
+            if 'bbox' not in target:
+                print(target)
+                continue
             x, y, w, h = target['bbox']
             target['boxes'] = torch.Tensor([x, y, x + w, y + h])
+            if w < 10 or h < 10:
+                # TOO SMALL REMOVE
+                continue
             del target['bbox']
             h, w = img.height, img.width
             target['masks'] = torch.tensor(_annToMask(target, h, w))
@@ -42,8 +49,9 @@ class TACODataset(torchvision.datasets.CocoDetection):
             if self.class_map:
                 cat_id = self.class_map[cat_id]
             target['labels'] = torch.tensor(cat_id)
+            new_targets.append(target)
 
-        return targets
+        return new_targets
 
 
 def process_csv(csvpath: str) -> Dict:

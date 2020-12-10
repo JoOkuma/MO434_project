@@ -1,8 +1,10 @@
 # code from: https://github.com/pytorch/vision/blob/master/references/detection/transforms.py
-# modified by jordao bragantini
+# heavily modified by jordao bragantini
 
 import random
 import torch
+import numpy as np
+from PIL import Image
 
 from torchvision.transforms import functional as F
 
@@ -56,4 +58,45 @@ class ToTensor(object):
     def __call__(self, image, target):
         image = F.to_tensor(image)
         return image, target
+
+class Resize:
+    def __init__(self, minimum_dim=800):
+        self.minimum_dim = minimum_dim
+
+    def __call__(self, image, targets):
+        h, w = image.shape[1:]
+        if h > w:
+            new_w = self.minimum_dim
+            new_h = int(round(h * new_w / w))
+        else:
+            new_h = self.minimum_dim
+            new_w = int(round(w * new_h / h))
+
+        size = (new_h, new_w)
+        image = F.resize(image, size)
+
+        new_targets = []
+        for target in targets:
+            target['masks'] = F.resize(target['masks'].unsqueeze(0), size,
+                                       interpolation=Image.NEAREST).squeeze()
+
+            if target['masks'].sum() > 0:
+                pos = np.where(target['masks'].numpy())
+                xmin = np.min(pos[1])
+                xmax = np.max(pos[1])
+                ymin = np.min(pos[0])
+                ymax = np.max(pos[0])
+            else:
+                xmin, ymin, xmax, ymax = 0, 0, 0, 0
+
+            xmin = max(0, xmin - 2)
+            xmax = min(new_w, xmax + 2)
+            ymin = max(0, ymin - 2)
+            ymax = min(new_h, ymax + 2)
+
+            target['boxes'] = torch.Tensor([xmin, ymin, xmax, ymax])
+            new_targets.append(target)
+
+        return image, new_targets
+
 

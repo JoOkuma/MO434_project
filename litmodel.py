@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torchvision
 import pytorch_lightning as pl
 
 
@@ -16,6 +17,17 @@ class LitModel(pl.LightningModule):
         x, y = batch
         loss_dict = self.model(x, y)
         return sum(loss for loss in loss_dict.values())
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        score_dict = self.model(x, y)
+        return score_dict
+
+    def validation_step_end(self, batch_parts):
+        pass
+
+    def validation_epoch_end(self, validation_steps_outputs):
+        pass
 
     def configure_optimizers(self):
         params = filter(lambda p: p.requires_grad, self.model.parameters())
