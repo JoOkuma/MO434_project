@@ -2,32 +2,51 @@ import torch
 import torch.nn as nn
 import torchvision
 import pytorch_lightning as pl
+from coco_utils import get_coco_api_from_dataset
+from coco_eval import CocoEvaluator
 
 
 class LitModel(pl.LightningModule):
-    def __init__(self, model: nn.Module):
+    def __init__(self, model: nn.Module, dataset):
         super().__init__()
 
         self.model = model
+        self.dataset = dataset
+
+    def _get_coco_eval(self):
+        coco = get_coco_api_from_dataset(self.dataset)
+        iou_types = ['segm', 'bbox']
+        return CocoEvaluator(coco, iou_types)
 
     def forward(self, x):
         return self.model(x)
 
     def training_step(self, batch, batch_idx):
+        if batch_idx % 10 == 0:
+            torch.cuda.empty_cache() 
         x, y = batch
         loss_dict = self.model(x, y)
         return sum(loss for loss in loss_dict.values())
 
     def validation_step(self, batch, batch_idx):
-        x, y = batch
-        score_dict = self.model(x, y)
-        return score_dict
+        if batch_idx % 10 == 0:
+            torch.cuda.empty_cache() 
+        x, targets = batch
+        outputs = self.model(x)
+        outputs = [{k: v.cpu() for k, v in t.items()} for t in outputs]
+        res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
+        self.coco_eval.update(res)
 
-    def validation_step_end(self, batch_parts):
-        pass
+    def on_validation_epoch_start(self):
+        self.n_threads = torch.get_num_threads()
+        torch.set_num_threads(1)
+        self.coco_eval = self._get_coco_eval()
 
     def validation_epoch_end(self, validation_steps_outputs):
-        pass
+        self.coco_eval.synchronize_between_processes()
+        self.coco_eval.accumulate()
+        self.coco_eval.summarize()
+        torch.set_num_threads(self.n_threads)
 
     def configure_optimizers(self):
         params = filter(lambda p: p.requires_grad, self.model.parameters())

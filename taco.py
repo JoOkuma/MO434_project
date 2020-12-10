@@ -14,7 +14,7 @@ class TACODataset(torchvision.datasets.CocoDetection):
         self.class_map = class_map
         self.n_classes = -1
         if self.class_map:
-            self.n_classes = len(set(self.class_map.values()))
+            self.n_classes = len(set(self.class_map.values())) + 1
 
     def __getitem__(self, index):
         coco = self.coco
@@ -59,7 +59,7 @@ def process_csv(csvpath: str) -> Dict:
     class2id = {}
     with open(csvpath) as f:
         reader = csv.reader(f)
-        count = 0
+        count = 1
         for i, row in enumerate(reader):
             if row[1] in str2id:
                 class2id[i] = str2id[row[1]]

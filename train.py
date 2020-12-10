@@ -16,7 +16,7 @@ def get_transform(train: bool):
     ]
     if train:
         transforms.append(T.RandomHorizontalFlip(0.5))
-        transforms.append(T.Resize())
+        # transforms.append(T.Resize())
     return T.Compose(transforms)
 
 
@@ -59,13 +59,14 @@ def main():
 
 
     trainer = pl.Trainer(
-        gpus=[0],
+        gpus=[4, 5, 6, 7],
         accumulate_grad_batches=2,
         # sync_batchnorm=True,
         terminate_on_nan=True,
+        accelerator='ddp',
     )
 
-    model = LitModel(get_segmentation_model(dataset.n_classes))
+    model = LitModel(get_segmentation_model(dataset.n_classes), dataset)
 
     trainer.fit(model, train_loader, val_loader)
 
