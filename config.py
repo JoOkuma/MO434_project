@@ -3,9 +3,9 @@ class Config:
 
     @staticmethod
     def images_dir() -> str:
-        return '/home/jbragantini/Softwares/TACO/data'
+        return '/tmp/TACO/data'
 
     @staticmethod
     def annot_path() -> str:
-        return '/home/jbragantini/Softwares/TACO/data/annotations.json'
+        return '/tmp/TACO/data/annotations.json'
 
