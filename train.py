@@ -61,7 +61,7 @@ def main():
     trainer = pl.Trainer(
         gpus=[4, 5, 6, 7],
         accumulate_grad_batches=2,
-        # sync_batchnorm=True,
+        sync_batchnorm=True,
         terminate_on_nan=True,
         accelerator='ddp',
     )

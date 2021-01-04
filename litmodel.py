@@ -22,14 +22,14 @@ class LitModel(pl.LightningModule):
         return self.model(x)
 
     def training_step(self, batch, batch_idx):
-        if batch_idx % 10 == 0:
+        if batch_idx % 5 == 0:
             torch.cuda.empty_cache() 
         x, y = batch
         loss_dict = self.model(x, y)
         return sum(loss for loss in loss_dict.values())
 
     def validation_step(self, batch, batch_idx):
-        if batch_idx % 10 == 0:
+        if batch_idx % 5 == 0:
             torch.cuda.empty_cache() 
         x, targets = batch
         outputs = self.model(x)
@@ -54,7 +54,6 @@ class LitModel(pl.LightningModule):
                                     lr=0.005,
                                     momentum=0.9,
                                     weight_decay=5e-4)
-
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
                                                     step_size=3,
                                                     gamma=0.1)
